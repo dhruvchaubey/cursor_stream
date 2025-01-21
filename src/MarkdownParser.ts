@@ -1,93 +1,77 @@
-const blogpostMarkdown = `# control
+class MarkdownParser {
+  private container: HTMLElement;
+  private buffer: string;
+  private isInsideCodeBlock: boolean;
+  private isInsideInlineCode: boolean;
 
-*humans should focus on bigger problems*
+  constructor(container: HTMLElement) {
+    this.container = container;
+    this.buffer = '';
+    this.isInsideCodeBlock = false;
+    this.isInsideInlineCode = false;
+  }
 
-## Setup
+  appendChunk(chunk: string) {
+    this.buffer += chunk;
 
-\`\`\`bash
-git clone git@github.com:anysphere/control
-\`\`\`
+    let renderedContent = '';
+    let i = 0;
 
-\`\`\`bash
-./init.sh
-\`\`\`
+    while (i < this.buffer.length) {
+      const char = this.buffer[i];
 
-## Folder structure
+      // Check for start or end of a code block (triple backticks)
+      if (this.buffer.slice(i, i + 3) === '```') {
+        if (this.isInsideCodeBlock) {
+          renderedContent += '</pre>'; // Close code block
+          this.isInsideCodeBlock = false;
+        } else {
+          renderedContent += '<pre>'; // Start code block
+          this.isInsideCodeBlock = true;
+        }
+        i += 3;
+        continue;
+      }
 
-**The most important folders are:**
+      // Check for start or end of an inline code block (single backtick)
+      if (char === '`') {
+        if (this.isInsideInlineCode) {
+          renderedContent += '</code>'; // Close inline code
+          this.isInsideInlineCode = false;
+        } else {
+          renderedContent += '<code>'; // Start inline code
+          this.isInsideInlineCode = true;
+        }
+        i++;
+        continue;
+      }
 
-1. \`vscode\`: this is our fork of vscode, as a submodule.
-2. \`milvus\`: this is where our Rust server code lives.
-3. \`schema\`: this is our Protobuf definitions for communication between the client and the server.
+      // Handle normal characters
+      if (this.isInsideCodeBlock || this.isInsideInlineCode) {
+        renderedContent += char; // Render code content as-is
+      } else {
+        // Escape HTML for normal text
+        if (char === '<') renderedContent += '&lt;';
+        else if (char === '>') renderedContent += '&gt;';
+        else if (char === '&') renderedContent += '&amp;';
+        else renderedContent += char;
+      }
 
-Each of the above folders should contain fairly comprehensive README files; please read them. If something is missing, or not working, please add it to the README!
-
-Some less important folders:
-
-1. \`release\`: this is a collection of scripts and guides for releasing various things.
-2. \`infra\`: infrastructure definitions for the on-prem deployment.
-3. \`third_party\`: where we keep our vendored third party dependencies.
-
-## Miscellaneous things that may or may not be useful
-
-##### Where to find rust-proto definitions
-
-They are in a file called \`aiserver.v1.rs\`. It might not be clear where that file is. Run \`rg --files --no-ignore bazel-out | rg aiserver.v1.rs\` to find the file.
-
-## Releasing
-
-Within \`vscode/\`:
-
-- Bump the version
-- Then:
-
-\`\`\`
-git checkout build-todesktop
-git merge main
-git push origin build-todesktop
-\`\`\`
-
-- Wait for 14 minutes for gulp and ~30 minutes for todesktop
-- Go to todesktop.com, test the build locally and hit release
-`;
-
-let currentContainer: HTMLElement | null = null; 
-// Do not edit this method
-function runStream() {
-    currentContainer = document.getElementById('markdownContainer')!;
-
-    // this randomly split the markdown into tokens between 2 and 20 characters long
-    // simulates the behavior of an ml model thats giving you weirdly chunked tokens
-    const tokens: string[] = [];
-    let remainingMarkdown = blogpostMarkdown;
-    while (remainingMarkdown.length > 0) {
-        const tokenLength = Math.floor(Math.random() * 18) + 2;
-        const token = remainingMarkdown.slice(0, tokenLength);
-        tokens.push(token);
-        remainingMarkdown = remainingMarkdown.slice(tokenLength);
+      i++;
     }
 
-    const toCancel = setInterval(() => {
-        const token = tokens.shift();
-        if (token) {
-            addToken(token);
-        } else {
-            clearInterval(toCancel);
-        }
-    }, 20);
+    this.buffer = ''; // Clear buffer after processing
+    this.appendToContainer(renderedContent);
+  }
+
+  private appendToContainer(content: string) {
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = content;
+
+    while (tempDiv.firstChild) {
+      this.container.appendChild(tempDiv.firstChild);
+    }
+  }
 }
 
-
-/* 
-Please edit the addToken method to support at least inline codeblocks and codeblocks. Feel free to add any other methods you need.
-This starter code does token streaming with no styling right now. Your job is to write the parsing logic to make the styling work.
-
-Note: don't be afraid of using globals for state. For this challenge, speed is preferred over cleanliness.
- */
-function addToken(token: string) {
-    if(!currentContainer) return;
-
-    const span = document.createElement('span');
-    span.innerText = token;
-    currentContainer.appendChild(span);
-}
+export default MarkdownParser;
